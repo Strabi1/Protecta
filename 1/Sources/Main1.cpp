@@ -8,6 +8,10 @@
 
 using namespace std;
 
+//================================================
+// Feladat 1
+//================================================
+
 bool Compare(const std::string& p_A_filename, const std::string& p_B_filename);
 uint32_t MyChkSum(const char* buff, size_t len, uint32_t prevchk);
 
