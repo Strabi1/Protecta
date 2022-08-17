@@ -12,7 +12,7 @@ CC := g++
 #======================================
 # Konyvtarak
 #======================================
-SRC_DIR := .
+SRC_DIR := ./Sources
 LIB_DIR += ./Libraries
 
 BUILD_DIR := ./Build
@@ -90,11 +90,7 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp $(HEADERS)
 	@echo $(MSG_COMPILING) $< "=>" $@
 	$(CC) $(CPPFLAGS) $(CXXFLAGS) $(INC) -c -o $@ $<
 
-b64:
-	$(shell base64 ./ShuttlePi > Build/ShuttlePi.b64)
-
 directories: $(BUILD_DIR) $(OBJ_DIR)
-
 
 begin:
 	@echo
@@ -124,16 +120,6 @@ run: all
 	@echo "====================================="
 	@echo
 	@ $(FULL_PROJ)
-
-#======================================
-# Forditas + futtatas (sudo)
-#======================================
-srun: all
-	@echo "====================================="
-	@echo Sudo run: $(PROJECT_NAME)
-	@echo "====================================="
-	@echo
-	@ sudo $(FULL_PROJ)
 
 #======================================
 # Clean
