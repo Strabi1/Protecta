@@ -9,12 +9,8 @@
 
 #include <iostream>
 
-using std::string;
-using std::vector;
-using std::multimap;
-using std::set;
-using std::list;
-
+unsigned long msElapsed(void);
+void MessageHandlingLoop(void);
 
 typedef enum commType
 {
@@ -29,6 +25,8 @@ typedef enum commType
 	BUSY
 } CommType;
 
+const uint32_t IDLE_TIMEOUT = 30000;
+
 class Client
 {
 private:
@@ -38,25 +36,18 @@ public:
 	~Client();
 
 	unsigned long lastMsgTime_ms = 0;
+	uint32_t waitSeqNumber = 1;
 	uint32_t ClientId;
 	CommType WaitCommState = START;
-
 };
 
-Client::Client()
-{
-}
-
-Client::~Client()
-{
-}
+Client::Client() {}
+Client::~Client() {}
 
 
 class Communication
 {
 private:
-	//static uint32_t nexId = 1;
-	
 
 public:
 	Communication();
@@ -64,7 +55,7 @@ public:
 
 	typedef struct msg_st
 	{
-		uint32_t msgId;
+		uint32_t seqNumber;
 		CommType type;
 		uint8_t len;
 		char *msg;
@@ -74,23 +65,22 @@ public:
 	void SendMessage(uint32_t clientId, CommType type) const;
 };
 
-Communication::Communication()
+Communication::Communication() {}
+Communication::~Communication() {}
+
+
+int main(int argc, char *argv[])
 {
+	
+	return EXIT_SUCCESS;
 }
 
-Communication::~Communication()
-{
-}
-
-unsigned long msElapsed(void);
-
-void MessageHandlingLoop(void);
 void MessageHandlingLoop(void)
 {
 	Communication COMM;
-	list<Client> clients;
+	std::list<Client> clients;
 	Communication::Msg_st *readMsg = nullptr;
-	const uint32_t IDLE_TIMEOUT = 30000;
+	bool comError = false;
 
 	while(true)
 	{
@@ -101,47 +91,56 @@ void MessageHandlingLoop(void)
 			if(readMsg == nullptr)
 				continue;
 
-			switch(i.WaitCommState)
+			if(readMsg->seqNumber != i.waitSeqNumber)
 			{
-				case START:
-				{
-					if(readMsg->type != TEXT && readMsg->type != KEEP)
-					{
-						i.WaitCommState = START;
-						COMM.SendMessage(i.ClientId, ABORT);
-						free(readMsg);
-					}
-					else
-						i.WaitCommState = readMsg->type;
-				} break;
-
-				case KEEP:
-				case TEXT:
-				{
-					if(msElapsed() - i.lastMsgTime_ms > IDLE_TIMEOUT)					// overflow save, due to unsigned arithmetic
-					{
-						i.WaitCommState = START;
-						COMM.SendMessage(i.ClientId, ABORT);
-						free(readMsg);
-					}
-					else if(readMsg->type == STOP)
-						i.WaitCommState = STOP;
-				}
-
-				
-				default:
-					break;
+				comError = true;
 			}
-			
-		}
-			
-	}
-	
+			else
+			{
+				switch(i.WaitCommState)
+				{
+					case START:
+					{
+						if(readMsg->type != TEXT && readMsg->type != KEEP)
+							comError = true;
+						else
+							i.WaitCommState = readMsg->type;
+					} break;
+
+					case KEEP:
+					case TEXT:
+					{
+						if(msElapsed() - i.lastMsgTime_ms > IDLE_TIMEOUT)					// overflow save, due to unsigned arithmetic
+							comError = true;
+						else if(readMsg->type == STOP)
+							i.WaitCommState = STOP;
+					} break;
+
+					case STOP:
+					{
+						if(readMsg->type != TEXT)
+							comError = true;
+						else
+							i.WaitCommState = START;
+					} break;
+					
+					default:
+						break;
+				}
+			}
+			if(comError)
+			{
+				i.WaitCommState = START;
+				COMM.SendMessage(i.ClientId, ABORT);
+				free(readMsg);
+			}
+		}		
+	}	
 }
 
-
-int main(int argc, char *argv[])
+// It just needs to compile
+unsigned long msElapsed(void)
 {
-	// Stored points
-	
+	// Mock
+	return 1;
 }
