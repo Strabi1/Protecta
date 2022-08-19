@@ -6,12 +6,17 @@
 #include <string>
 #include <sstream>
 
-using namespace std;
+using std::string;
+using std::cout;
+using std::endl;
+using std::min;
+using std::ifstream;
+using std::ostringstream;
+using std::fstream;
 
 //================================================
 // Feladat 1
 //================================================
-
 bool Compare(const std::string& p_A_filename, const std::string& p_B_filename);
 uint32_t MyChkSum(const char* buff, size_t len, uint32_t prevchk);
 
@@ -35,7 +40,6 @@ bool Compare(const std::string& p_A_filename, const std::string& p_B_filename)
 	ostringstream ossA;
 	string strA;
 	ifstream ifs(p_A_filename);
-	// int sizeB;
 	int32_t sizeA;
 	char *arrB;
 	uint32_t prevchkA = 0, prevchkB = 0;
@@ -49,13 +53,8 @@ bool Compare(const std::string& p_A_filename, const std::string& p_B_filename)
 	strA = ossA.str();
 	sizeA = strA.size();
 
-	printf("A: %s size:%d\n", strA.c_str(), sizeA);
-
 	// Read B file
 	ifs.open(p_B_filename);
-
-	// ifs.seekg(0, fstream::end);
-	// sizeB = ifs.tellg();
 
 	ifs.seekg(0, fstream::beg);
 
@@ -63,15 +62,9 @@ bool Compare(const std::string& p_A_filename, const std::string& p_B_filename)
 
 	if(ifs.read(arrB, sizeA).eof())
 	{
-		printf("hiba\n");
-
 		// A file is bigger
 		ifs.close();
 		return false;
-	}
-	else
-	{
-		printf("ok\n");
 	}
 
 	ifs.close();
@@ -95,6 +88,7 @@ bool Compare(const std::string& p_A_filename, const std::string& p_B_filename)
 	return success;
 }
 
+// It just needs to compile
 uint32_t MyChkSum(const char* buff, size_t len, uint32_t prevchk)
 {
 	// Mock
