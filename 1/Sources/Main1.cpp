@@ -18,18 +18,23 @@ uint32_t MyChkSum(const char* buff, size_t len, uint32_t prevchk);
 
 int main(int argc, char *argv[])
 {
-	
+	const string pathA = "./A.txt";
+	const string pathB = "./B.txt";
+
+	if(Compare(pathA, pathB))
+		cout << "B starts with the same bytes as the whole A file" << endl;
+	else
+		cout << "B starts with the other bytes as the whole A file" << endl;
 }
 
 bool Compare(const std::string& p_A_filename, const std::string& p_B_filename)
 {
-	const char pathA[] = "./A.txt";
-	const char pathB[] = "./B.txt";
-	const uint16_t fragmentSize = 1024;
+	
+	const uint16_t FRANGMENT_SIZE = 1024;
 
 	ostringstream ossA;
 	string strA;
-	ifstream ifs(pathA);
+	ifstream ifs(p_A_filename);
 	// int sizeB;
 	int32_t sizeA;
 	char *arrB;
@@ -47,7 +52,7 @@ bool Compare(const std::string& p_A_filename, const std::string& p_B_filename)
 	printf("A: %s size:%d\n", strA.c_str(), sizeA);
 
 	// Read B file
-	ifs.open(pathB);
+	ifs.open(p_B_filename);
 
 	// ifs.seekg(0, fstream::end);
 	// sizeB = ifs.tellg();
@@ -82,7 +87,7 @@ bool Compare(const std::string& p_A_filename, const std::string& p_B_filename)
 		}
 
 		++fragmentCnt;
-		sizeA -= fragmentSize;
+		sizeA -= FRANGMENT_SIZE;
 	}
 	
 	delete[] arrB;
