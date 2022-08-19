@@ -75,6 +75,8 @@ int main(int argc, char *argv[])
 	return EXIT_SUCCESS;
 }
 
+// TODO: start eseten client hozzadasa, stopa vagy hiba eseten eltavolitas, tartolni a mar foglalt id-kat, start eseten adni neki egy nem foglaltat
+
 void MessageHandlingLoop(void)
 {
 	Communication COMM;
@@ -133,6 +135,7 @@ void MessageHandlingLoop(void)
 				i.WaitCommState = START;
 				COMM.SendMessage(i.ClientId, ABORT);
 				free(readMsg);
+				clients.remove(i);
 			}
 		}		
 	}	
