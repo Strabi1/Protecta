@@ -12,7 +12,7 @@ CC := g++
 #======================================
 # Konyvtarak
 #======================================
-SRC_DIR := ./Sources
+SRC_DIR := .
 LIB_DIR += ./Libraries
 
 BUILD_DIR := ./Build
