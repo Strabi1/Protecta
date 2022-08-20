@@ -9,6 +9,8 @@
 
 #include <iostream>
 
+const uint32_t MAX_CONN = 100;
+
 unsigned long msElapsed(void);
 void MessageHandlingLoop(void);
 
@@ -32,7 +34,7 @@ class Client
 private:
 	
 public:
-	Client();
+	Client(uint32_t id);
 	~Client();
 
 	unsigned long lastMsgTime_ms = 0;
@@ -41,13 +43,15 @@ public:
 	CommType WaitCommState = START;
 };
 
-Client::Client() {}
+Client::Client(uint32_t id): ClientId{id} {}
 Client::~Client() {}
 
 
 class Communication
 {
 private:
+	bool ReservedIds[MAX_CONN];
+	uint32_t ClientNumber = 0; 
 
 public:
 	Communication();
@@ -61,13 +65,42 @@ public:
 		char *msg;
 	} Msg_st;
 
+	std::list<Client> clients;
+
 	Msg_st *GetMessage(uint32_t clientId, uint32_t timeout) const;
 	void SendMessage(uint32_t clientId, CommType type) const;
+	void AddNewClient(void);
 };
 
 Communication::Communication() {}
 Communication::~Communication() {}
 
+void Communication::AddNewClient(void)
+{
+	if(ClientNumber >= MAX_CONN)
+	{
+		// Dedicated time, to notify the client that there are no more free connections
+		SendMessage(MAX_CONN + 1, BUSY);
+	}
+	else
+	{
+		uint32_t i = 0;
+		for (; i < MAX_CONN; i++)
+		{
+			if(!ReservedIds[i])
+			{
+				ReservedIds[i] = true;
+				clients.push_back(Client(i));
+				++ClientNumber;
+				break;
+			}
+		}
+
+		// Error
+		if(i >= MAX_CONN)
+			SendMessage(MAX_CONN + 1, BUSY);
+	}
+}
 
 int main(int argc, char *argv[])
 {
@@ -75,18 +108,16 @@ int main(int argc, char *argv[])
 	return EXIT_SUCCESS;
 }
 
-// TODO: start eseten client hozzadasa, stopa vagy hiba eseten eltavolitas, tartolni a mar foglalt id-kat, start eseten adni neki egy nem foglaltat
-
 void MessageHandlingLoop(void)
 {
 	Communication COMM;
-	std::list<Client> clients;
+	
 	Communication::Msg_st *readMsg = nullptr;
 	bool comError = false;
 
 	while(true)
 	{
-		for (auto &&i : clients)
+		for (auto &&i : COMM.clients)
 		{
 			readMsg = COMM.GetMessage(i.ClientId, IDLE_TIMEOUT);
 
@@ -103,10 +134,10 @@ void MessageHandlingLoop(void)
 				{
 					case START:
 					{
-						if(readMsg->type != TEXT && readMsg->type != KEEP)
+						if(readMsg->type != START)
 							comError = true;
 						else
-							i.WaitCommState = readMsg->type;
+							i.WaitCommState = TEXT;
 					} break;
 
 					case KEEP:
@@ -114,16 +145,23 @@ void MessageHandlingLoop(void)
 					{
 						if(msElapsed() - i.lastMsgTime_ms > IDLE_TIMEOUT)					// overflow save, due to unsigned arithmetic
 							comError = true;
-						else if(readMsg->type == STOP)
-							i.WaitCommState = STOP;
-					} break;
-
-					case STOP:
-					{
-						if(readMsg->type != TEXT)
+						
+						else if(!(readMsg->type == TEXT || readMsg->type == KEEP
+							|| readMsg->type == STOP && readMsg->seqNumber >= 3))
+						{
+							// The stop message must be at least the 3rd message
 							comError = true;
-						else
+						}
+
+						else if(readMsg->type == TEXT)
+						{
+							printf("%s", readMsg->msg);
+						}
+						else if(readMsg->type == STOP)
+						{
 							i.WaitCommState = START;
+							i.waitSeqNumber = 1;
+						}
 					} break;
 					
 					default:
@@ -135,7 +173,7 @@ void MessageHandlingLoop(void)
 				i.WaitCommState = START;
 				COMM.SendMessage(i.ClientId, ABORT);
 				free(readMsg);
-				clients.remove(i);
+				COMM.clients.remove(i);
 			}
 		}		
 	}	
