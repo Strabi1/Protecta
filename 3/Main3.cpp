@@ -16,16 +16,17 @@ void MessageHandlingLoop(void);
 
 typedef enum commType
 {
-	// client side
 	START,
 	KEEP,
 	TEXT,
 	STOP,
-
-	// server side
-	ABORT = 0x10,
-	BUSY
 } CommType;
+
+typedef enum errorType
+{
+	ABORT,
+	BUSY
+} ErrorType;
 
 const uint32_t IDLE_TIMEOUT = 30000;
 
@@ -35,6 +36,7 @@ private:
 	
 public:
 	Client(uint32_t id);
+	Client();
 	~Client();
 
 	unsigned long lastMsgTime_ms = 0;
@@ -43,7 +45,8 @@ public:
 	CommType WaitCommState = START;
 };
 
-Client::Client(uint32_t id): ClientId{id} {}
+Client::Client(uint32_t id = 0): ClientId{id} {}
+Client::Client() {}
 Client::~Client() {}
 
 
@@ -68,7 +71,7 @@ public:
 	std::list<Client> clients;
 
 	Msg_st *GetMessage(uint32_t clientId, uint32_t timeout) const;
-	void SendMessage(uint32_t clientId, CommType type) const;
+	void SendMessage(uint32_t clientId, ErrorType type) const;
 	void AddNewClient(void);
 };
 
@@ -117,7 +120,8 @@ void MessageHandlingLoop(void)
 
 	while(true)
 	{
-		for (auto &&i : COMM.clients)
+		for (auto i : COMM.clients)
+		//for (auto i = COMM.clients.begin(); i != COMM.clients.end; i++)	
 		{
 			readMsg = COMM.GetMessage(i.ClientId, IDLE_TIMEOUT);
 
@@ -147,7 +151,7 @@ void MessageHandlingLoop(void)
 							comError = true;
 						
 						else if(!(readMsg->type == TEXT || readMsg->type == KEEP
-							|| readMsg->type == STOP && readMsg->seqNumber >= 3))
+							|| (readMsg->type == STOP && readMsg->seqNumber >= 3)))
 						{
 							// The stop message must be at least the 3rd message
 							comError = true;
@@ -173,13 +177,24 @@ void MessageHandlingLoop(void)
 				i.WaitCommState = START;
 				COMM.SendMessage(i.ClientId, ABORT);
 				free(readMsg);
-				COMM.clients.remove(i);
+				//COMM.clients.erase(i);
+				const Client cl = i;
+				//COMM.clients.remove(cl);
 			}
-		}		
+		}
 	}	
 }
 
 // It just needs to compile
+void Communication::SendMessage(uint32_t clientId, ErrorType type) const
+{
+}
+
+Communication::Msg_st* Communication::GetMessage(uint32_t clientId, uint32_t timeout) const
+{
+	return nullptr;
+}
+
 unsigned long msElapsed(void)
 {
 	// Mock
