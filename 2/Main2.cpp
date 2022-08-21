@@ -27,6 +27,7 @@ float CalculateBiggestRadius(const std::vector<Point>& points);
 
 int main(int argc, char *argv[])
 {
+	// Test datas
 	// Stored points, with test datas
 	// Pythagorean triples
 	std::vector<Point> Points = {

@@ -10,6 +10,7 @@
 #include <iostream>
 
 const uint32_t MAX_CONN = 100;
+const uint32_t IDLE_TIMEOUT = 30000;
 
 unsigned long msElapsed(void);
 void MessageHandlingLoop(void);
@@ -28,27 +29,19 @@ typedef enum errorType
 	BUSY
 } ErrorType;
 
-const uint32_t IDLE_TIMEOUT = 30000;
-
 class Client
 {
 private:
 	
 public:
-	Client(uint32_t id);
-	Client();
-	~Client();
+	Client(uint32_t id) : ClientId{id} {}
+	~Client() {}
 
 	unsigned long lastMsgTime_ms = 0;
 	uint32_t waitSeqNumber = 1;
 	uint32_t ClientId;
 	CommType WaitCommState = START;
 };
-
-Client::Client(uint32_t id = 0): ClientId{id} {}
-Client::Client() {}
-Client::~Client() {}
-
 
 class Communication
 {
@@ -57,8 +50,8 @@ private:
 	uint32_t ClientNumber = 0; 
 
 public:
-	Communication();
-	~Communication();
+	Communication() {}
+	~Communication() {}
 
 	typedef struct msg_st
 	{
@@ -73,10 +66,8 @@ public:
 	Msg_st *GetMessage(uint32_t clientId, uint32_t timeout) const;
 	void SendMessage(uint32_t clientId, ErrorType type) const;
 	void AddNewClient(void);
+	void ReleaseId(uint32_t id);
 };
-
-Communication::Communication() {}
-Communication::~Communication() {}
 
 void Communication::AddNewClient(void)
 {
@@ -105,8 +96,19 @@ void Communication::AddNewClient(void)
 	}
 }
 
+void Communication::ReleaseId(uint32_t id)
+{
+	if(id < MAX_CONN)
+		ReservedIds[id] = false;
+}
+
 int main(int argc, char *argv[])
 {
+	std::cout << "Server start" << std::endl; 
+	while(true)
+	{
+		MessageHandlingLoop();
+	}
 	
 	return EXIT_SUCCESS;
 }
@@ -120,34 +122,35 @@ void MessageHandlingLoop(void)
 
 	while(true)
 	{
-		for (auto i : COMM.clients)
-		//for (auto i = COMM.clients.begin(); i != COMM.clients.end; i++)	
+		//for (auto i : COMM.clients)
+		for (auto it = COMM.clients.begin(); it != COMM.clients.end(); it++)	
 		{
-			readMsg = COMM.GetMessage(i.ClientId, IDLE_TIMEOUT);
+			readMsg = COMM.GetMessage(it->ClientId, IDLE_TIMEOUT);
 
 			if(readMsg == nullptr)
 				continue;
 
-			if(readMsg->seqNumber != i.waitSeqNumber)
+			if(readMsg->seqNumber != it->waitSeqNumber)
 			{
 				comError = true;
 			}
 			else
 			{
-				switch(i.WaitCommState)
+				switch(it->WaitCommState)
 				{
 					case START:
 					{
 						if(readMsg->type != START)
 							comError = true;
 						else
-							i.WaitCommState = TEXT;
+							it->WaitCommState = TEXT;
 					} break;
 
 					case KEEP:
 					case TEXT:
 					{
-						if(msElapsed() - i.lastMsgTime_ms > IDLE_TIMEOUT)					// overflow save, due to unsigned arithmetic
+						// overflow save, due to unsigned arithmetic
+						if(msElapsed() - it->lastMsgTime_ms > IDLE_TIMEOUT)
 							comError = true;
 						
 						else if(!(readMsg->type == TEXT || readMsg->type == KEEP
@@ -163,8 +166,8 @@ void MessageHandlingLoop(void)
 						}
 						else if(readMsg->type == STOP)
 						{
-							i.WaitCommState = START;
-							i.waitSeqNumber = 1;
+							it->WaitCommState = START;
+							it->waitSeqNumber = 1;
 						}
 					} break;
 					
@@ -174,12 +177,14 @@ void MessageHandlingLoop(void)
 			}
 			if(comError)
 			{
-				i.WaitCommState = START;
-				COMM.SendMessage(i.ClientId, ABORT);
+				it->WaitCommState = START;
+				COMM.SendMessage(it->ClientId, ABORT);
+				// Free message
 				free(readMsg);
-				//COMM.clients.erase(i);
-				const Client cl = i;
-				//COMM.clients.remove(cl);
+				// Release client id
+				COMM.ReleaseId(it->ClientId);
+				// Remove a client from the list
+				COMM.clients.erase(it);
 			}
 		}
 	}	
