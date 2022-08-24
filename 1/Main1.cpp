@@ -27,16 +27,16 @@ bool Compare(const std::string& p_A_filename, const std::string& p_B_filename)
 	char arrA[FRANGMENT_SIZE + 1], arrB[FRANGMENT_SIZE + 1];
 	uint16_t readA, readB;
 	uint32_t prevchkA = 0, prevchkB = 0;
-	bool success = true;
+	bool success = true, eof = false;
 	std::ifstream ifsA(p_A_filename);
 	std::ifstream ifsB(p_B_filename);
 
-	ifsA.seekg(0, std::fstream::beg);
+	eof = ifsA.seekg(0, std::fstream::beg).eof();
 	ifsB.seekg(0, std::fstream::beg);	
 
 	do
 	{
-		ifsA.read(arrA, FRANGMENT_SIZE).eof();
+		eof = ifsA.read(arrA, FRANGMENT_SIZE).eof();
 		readA = ifsA.gcount();
 		arrA[readA] = '\0';
 
@@ -50,7 +50,7 @@ bool Compare(const std::string& p_A_filename, const std::string& p_B_filename)
 		if(prevchkA != prevchkB)
 			success = false;
 
-	} while(readA && success);
+	} while(!eof && success);
 
 	ifsA.close();
 	ifsB.close();
