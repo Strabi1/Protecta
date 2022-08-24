@@ -2,8 +2,6 @@
 #include <iostream>
 #include <fstream>
 #include <string>
-#include <sstream>
-
 
 const uint16_t FRANGMENT_SIZE = 1024;
 
@@ -26,55 +24,36 @@ int main(int argc, char *argv[])
 
 bool Compare(const std::string& p_A_filename, const std::string& p_B_filename)
 {
-	std::ifstream ifs(p_A_filename);
-	std::ostringstream ossA;
-	std::string strA;
-
-	int32_t sizeA;
-	char *arrB;
+	char arrA[FRANGMENT_SIZE + 1], arrB[FRANGMENT_SIZE + 1];
+	uint16_t readA, readB;
 	uint32_t prevchkA = 0, prevchkB = 0;
-	uint16_t fragmentCnt = 0;
 	bool success = true;
+	std::ifstream ifsA(p_A_filename);
+	std::ifstream ifsB(p_B_filename);
 
-	// Read A file
-	ossA << ifs.rdbuf();
-	ifs.close();
+	ifsA.seekg(0, std::fstream::beg);
+	ifsB.seekg(0, std::fstream::beg);	
 
-	strA = ossA.str();
-	sizeA = strA.size();
-
-	// Read B file
-	ifs.open(p_B_filename);
-
-	ifs.seekg(0, std::fstream::beg);
-
-	arrB = new char[sizeA + 1];
-
-	if(ifs.read(arrB, sizeA).eof())
+	do
 	{
-		// A file is bigger
-		ifs.close();
-		delete[] arrB;
-		return false;
-	}
+		ifsA.read(arrA, FRANGMENT_SIZE).eof();
+		readA = ifsA.gcount();
+		arrA[readA] = '\0';
 
-	ifs.close();
+		ifsB.read(arrB, readA);
+		readB = ifsB.gcount();
+		arrB[readB] = '\0';
 
-	while(sizeA > 0 && success)
-	{
-		prevchkA = MyChkSum(strA.substr(fragmentCnt * 1024, std::min(1024, sizeA)).c_str(), std::min(1024, sizeA), prevchkA);
-		prevchkB = MyChkSum(&arrB[fragmentCnt * 1024], std::min(1024, sizeA), prevchkB);
+		prevchkA = MyChkSum(arrA, readA, prevchkA);
+		prevchkB = MyChkSum(arrB, readB, prevchkB);
 
 		if(prevchkA != prevchkB)
-		{
 			success = false;
-		}
 
-		++fragmentCnt;
-		sizeA -= FRANGMENT_SIZE;
-	}
-	
-	delete[] arrB;
+	} while(readA && success);
+
+	ifsA.close();
+	ifsB.close();
 
 	return success;
 }
