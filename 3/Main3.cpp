@@ -43,8 +43,45 @@ public:
 	CommType WaitCommState = START;
 };
 
+// Singleton
 class Communication
 {
+protected:
+	Communication() {}
+	~Communication() {}
+
+	static Communication *Comm;
+
+public:
+	// Prevents copying
+	Communication(Communication const &comm) = delete;
+	void operator=(Communication const &comm) = delete;
+
+	static Communication *getInstance();
+	/*
+	{
+		if (!Comm)
+			Comm = new Communication;
+	
+		return Comm;
+	}
+	*/
+
+	typedef struct msg_st
+	{
+		uint32_t clienId;
+		uint32_t seqNumber;
+		CommType type;
+		uint8_t len;
+		char *msg;
+	} Msg_st;
+
+	//std::list<Client> clients;
+
+	virtual Msg_st *GetMessage(uint32_t timeout) const = 0;
+	virtual void SendMessage(const Msg_st &msg) const = 0;
+
+#if 0
 private:
 	bool ReservedIds[MAX_CONN];
 	uint32_t ClientNumber = 0; 
@@ -67,8 +104,10 @@ public:
 	void SendMessage(uint32_t clientId, ErrorType type) const;
 	void AddNewClient(void);
 	void ReleaseId(uint32_t id);
+#endif
 };
 
+#if 0
 void Communication::AddNewClient(void)
 {
 	if(ClientNumber >= MAX_CONN)
@@ -101,6 +140,28 @@ void Communication::ReleaseId(uint32_t id)
 	if(id < MAX_CONN)
 		ReservedIds[id] = false;
 }
+#endif
+
+class MyComm : public Communication
+{
+protected:
+	MyComm() {}
+	~MyComm() {}
+
+public:
+	static Communication *getInstance()
+	{
+		if(!Comm)
+			Comm = new MyComm;
+
+		return Comm;
+	}
+
+	Msg_st *GetMessage(uint32_t timeout) const { return nullptr; }
+	void SendMessage(const Msg_st &msg) const {}
+};
+
+Communication *Communication::Comm = nullptr;
 
 int main(int argc, char *argv[])
 {
@@ -113,9 +174,14 @@ int main(int argc, char *argv[])
 	return EXIT_SUCCESS;
 }
 
+//TODO: clien struckturabol lehet ki lehetne szedni a id-t és map-ben tároltni
+// megkeresni melyik id az üzet (ha nem nullpointer), és az adott liens dolgait (timeout üzenet seq nézni) )
+
 void MessageHandlingLoop(void)
 {
-	Communication COMM;
+	//Communication COMM;
+	Communication *COMM = COMM->getInstance();
+	std::list<Client> clients;
 	
 	Communication::Msg_st *readMsg = nullptr;
 	bool comError = false;
@@ -123,9 +189,9 @@ void MessageHandlingLoop(void)
 	while(true)
 	{
 		//for (auto i : COMM.clients)
-		for (auto it = COMM.clients.begin(); it != COMM.clients.end(); it++)	
+		readMsg = COMM->GetMessage(IDLE_TIMEOUT);
+		for (auto it = clients.begin(); it != clients.end(); it++)	
 		{
-			readMsg = COMM.GetMessage(it->ClientId, IDLE_TIMEOUT);
 
 			if(readMsg == nullptr)
 				continue;
