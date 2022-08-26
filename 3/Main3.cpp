@@ -1,14 +1,10 @@
 
-#include <cstdint>
-#include <cmath>
-#include <string>
-#include <vector>
-#include <map>
-#include <set>
-#include <list>
 
 #include <iostream>
+#include <list>
+#include <string>
 #include <algorithm>
+
 
 const uint32_t MAX_CONN = 100;
 const uint32_t IDLE_TIMEOUT = 30000;
@@ -27,11 +23,6 @@ typedef enum commType
 	BUSY
 } CommType;
 
-// typedef enum errorType
-// {
-// 	ABORT,
-// 	BUSY
-// } ErrorType;
 
 class Client
 {
@@ -57,11 +48,11 @@ protected:
 	static Communication *Comm;
 
 public:
-	// Prevents copying
 	static Communication *getInstance();
+
+	// Prevents copying
 	Communication(Communication const &comm) = delete;
 	void operator=(Communication const &comm) = delete;
-
 
 	typedef struct msg_st
 	{
@@ -76,6 +67,7 @@ public:
 	virtual void SendMessage(const Msg_st &msg) const = 0;
 };
 
+// For testing, the Communication class is an abstract class
 class MyComm : public Communication
 {
 protected:
@@ -83,6 +75,11 @@ protected:
 	~MyComm() {}
 
 public:
+
+	// Prevents copying
+	MyComm(MyComm const &comm) = delete;
+	void operator=(MyComm const &comm) = delete;
+
 	static Communication *getInstance()
 	{
 		if(!Comm)
