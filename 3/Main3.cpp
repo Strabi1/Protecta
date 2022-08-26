@@ -41,8 +41,8 @@ public:
 	Client(uint32_t id) : ClientId{id} {}
 	~Client() {}
 
-	unsigned long lastMsgTime_ms = 0;
-	uint32_t waitSeqNumber = 1;
+	unsigned long LastMsgTime_ms = 0;
+	uint32_t WaitSeqNumber = 1;
 	uint32_t ClientId;
 	CommType WaitCommState = START;
 };
@@ -62,14 +62,6 @@ public:
 	void operator=(Communication const &comm) = delete;
 
 	static Communication *getInstance();
-	/*
-	{
-		if (!Comm)
-			Comm = new Communication;
-	
-		return Comm;
-	}
-	*/
 
 	typedef struct msg_st
 	{
@@ -80,35 +72,8 @@ public:
 		char *msg;
 	} Msg_st;
 
-	//std::list<Client> clients;
-
 	virtual Msg_st *GetMessage(uint32_t timeout) const = 0;
 	virtual void SendMessage(const Msg_st &msg) const = 0;
-
-#if 0
-private:
-	bool ReservedIds[MAX_CONN];
-	uint32_t ClientNumber = 0; 
-
-public:
-	Communication() {}
-	~Communication() {}
-
-	typedef struct msg_st
-	{
-		uint32_t seqNumber;
-		CommType type;
-		uint8_t len;
-		char *msg;
-	} Msg_st;
-
-	std::list<Client> clients;
-
-	Msg_st *GetMessage(uint32_t clientId, uint32_t timeout) const;
-	void SendMessage(uint32_t clientId, ErrorType type) const;
-	void AddNewClient(void);
-	void ReleaseId(uint32_t id);
-#endif
 };
 
 class ClientIdEqaul
@@ -119,44 +84,9 @@ public:
 	ClientIdEqaul(uint32_t than): than{than} {}
 	~ClientIdEqaul() {}
 	
-	bool operator()(uint32_t clientId) const { return than == clientId; }
+	bool operator()(Client &client) const { return than == client.ClientId; }
 };
 
-
-#if 0
-void Communication::AddNewClient(void)
-{
-	if(ClientNumber >= MAX_CONN)
-	{
-		// Dedicated time, to notify the client that there are no more free connections
-		SendMessage(MAX_CONN + 1, BUSY);
-	}
-	else
-	{
-		uint32_t i = 0;
-		for (; i < MAX_CONN; i++)
-		{
-			if(!ReservedIds[i])
-			{
-				ReservedIds[i] = true;
-				clients.push_back(Client(i));
-				++ClientNumber;
-				break;
-			}
-		}
-
-		// Error
-		if(i >= MAX_CONN)
-			SendMessage(MAX_CONN + 1, BUSY);
-	}
-}
-
-void Communication::ReleaseId(uint32_t id)
-{
-	if(id < MAX_CONN)
-		ReservedIds[id] = false;
-}
-#endif
 
 class MyComm : public Communication
 {
@@ -190,45 +120,27 @@ int main(int argc, char *argv[])
 	return EXIT_SUCCESS;
 }
 
-//TODO: clien struckturabol lehet ki lehetne szedni a id-t és map-ben tároltni
-// megkeresni melyik id az üzet (ha nem nullpointer), és az adott liens dolgait (timeout üzenet seq nézni) )
-
 void MessageHandlingLoop(void)
 {
-	//Communication COMM;
-	Communication *COMM = COMM->getInstance();
-	std::vector<Client> clients;
-	//std::set<Client> clients;
-
+	MyComm *COMM = COMM->getInstance();
+	std::list<Client> clients;
 	Communication::Msg_st *readMsg = nullptr;
 	bool comError = false;
 
 	while(true)
 	{
-		//for (auto i : COMM.clients)
 		readMsg = COMM->GetMessage(IDLE_TIMEOUT);
 
 		if(!readMsg)
-			continue;		// Timeout
+			continue;					// Timeout
 
-		//auto actClient = std::find_if(clients.begin(), clients.end(), ClientIdEqaul(readMsg->clienId));
-		//std::set<Client>::iterator actClient = std::find_if(clients.begin(), clients.end(), ClientIdEqaul(readMsg->clienId));
+		auto actClient = std::find_if(clients.begin(), clients.end(), ClientIdEqaul(readMsg->clienId));
 
-		Client *actClient = nullptr;
-
-		uint32_t i = 0;
-		for(; i < clients.size(); i++)
-		{
-			if(clients[i].ClientId == readMsg->clienId)
-				actClient = &clients[i];
-		}
-
-		if(!actClient)
+		if(actClient == clients.end())
 			continue;					// Error, unknown client
 
-			//clients[i].waitSeqNumber = 55;
 
-		if(readMsg->seqNumber != actClient->waitSeqNumber)
+		if(readMsg->seqNumber != actClient->WaitSeqNumber)
 			comError = true;
 			
 		else
@@ -247,7 +159,7 @@ void MessageHandlingLoop(void)
 				case TEXT:
 				{
 					// overflow save, due to unsigned arithmetic
-					if(msElapsed() - actClient->lastMsgTime_ms > IDLE_TIMEOUT)
+					if(msElapsed() - actClient->LastMsgTime_ms > IDLE_TIMEOUT)
 						comError = true;
 					
 					else if(!(readMsg->type == TEXT || readMsg->type == KEEP
@@ -264,13 +176,15 @@ void MessageHandlingLoop(void)
 					else if(readMsg->type == STOP)
 					{
 						actClient->WaitCommState = START;
-						actClient->waitSeqNumber = 1;
+						actClient->WaitSeqNumber = 0;
 					}
 				} break;
 				
 				default:
 					break;
 			}
+
+			actClient->WaitSeqNumber++;
 		}
 		if(comError)
 		{
@@ -281,92 +195,9 @@ void MessageHandlingLoop(void)
 
 			// Free message
 			free(readMsg);
-
-			// Release client id
-			//COMM.ReleaseId(it->ClientId);
-
-			// Remove a client from the list
-			clients.erase(clients.begin() + i);
+			clients.erase(actClient);
 		}
-		
-
-#if 0
-		for (auto it = clients.begin(); it != clients.end(); it++)	
-		{
-
-			if(readMsg == nullptr)
-				continue;
-
-			if(readMsg->seqNumber != it->waitSeqNumber)
-			{
-				comError = true;
-			}
-			else
-			{
-				switch(it->WaitCommState)
-				{
-					case START:
-					{
-						if(readMsg->type != START)
-							comError = true;
-						else
-							it->WaitCommState = TEXT;
-					} break;
-
-					case KEEP:
-					case TEXT:
-					{
-						// overflow save, due to unsigned arithmetic
-						if(msElapsed() - it->lastMsgTime_ms > IDLE_TIMEOUT)
-							comError = true;
-						
-						else if(!(readMsg->type == TEXT || readMsg->type == KEEP
-							|| (readMsg->type == STOP && readMsg->seqNumber >= 3)))
-						{
-							// The stop message must be at least the 3rd message
-							comError = true;
-						}
-
-						else if(readMsg->type == TEXT)
-						{
-							printf("%s", readMsg->msg);
-						}
-						else if(readMsg->type == STOP)
-						{
-							it->WaitCommState = START;
-							it->waitSeqNumber = 1;
-						}
-					} break;
-					
-					default:
-						break;
-				}
-			}
-			if(comError)
-			{
-				it->WaitCommState = START;
-				COMM.SendMessage(it->ClientId, ABORT);
-				// Free message
-				free(readMsg);
-				// Release client id
-				COMM.ReleaseId(it->ClientId);
-				// Remove a client from the list
-				COMM.clients.erase(it);
-			}
-		}
-#endif
-
 	}	
-}
-
-// It just needs to compile
-void Communication::SendMessage(uint32_t clientId, ErrorType type) const
-{
-}
-
-Communication::Msg_st* Communication::GetMessage(uint32_t clientId, uint32_t timeout) const
-{
-	return nullptr;
 }
 
 unsigned long msElapsed(void)
