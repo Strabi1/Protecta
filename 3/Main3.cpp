@@ -58,10 +58,10 @@ protected:
 
 public:
 	// Prevents copying
+	static Communication *getInstance();
 	Communication(Communication const &comm) = delete;
 	void operator=(Communication const &comm) = delete;
 
-	static Communication *getInstance();
 
 	typedef struct msg_st
 	{
@@ -75,18 +75,6 @@ public:
 	virtual Msg_st *GetMessage(uint32_t timeout) const = 0;
 	virtual void SendMessage(const Msg_st &msg) const = 0;
 };
-
-class ClientIdEqaul
-{
-private:
-	uint32_t than;
-public:
-	ClientIdEqaul(uint32_t than): than{than} {}
-	~ClientIdEqaul() {}
-	
-	bool operator()(Client &client) const { return than == client.ClientId; }
-};
-
 
 class MyComm : public Communication
 {
@@ -107,6 +95,17 @@ public:
 	void SendMessage(const Msg_st &msg) const {}
 };
 
+class ClientIdEqaul
+{
+private:
+	uint32_t than;
+public:
+	ClientIdEqaul(uint32_t than): than{than} {}
+	~ClientIdEqaul() {}
+	
+	bool operator()(Client &client) const { return than == client.ClientId; }
+};
+
 Communication *Communication::Comm = nullptr;
 
 int main(int argc, char *argv[])
@@ -122,7 +121,7 @@ int main(int argc, char *argv[])
 
 void MessageHandlingLoop(void)
 {
-	MyComm *COMM = COMM->getInstance();
+	MyComm *COMM = (MyComm*)COMM->getInstance();
 	std::list<Client> clients;
 	Communication::Msg_st *readMsg = nullptr;
 	bool comError = false;
