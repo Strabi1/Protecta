@@ -32,11 +32,15 @@ public:
 	Client(uint32_t id) : ClientId{id} {}
 	~Client() {}
 
+	bool TimedOut(void) { return (( (msElapsed() - LastMsgTime_ms) > IDLE_TIMEOUT) ? true : false); }
+
 	unsigned long LastMsgTime_ms = 0;
 	uint32_t WaitSeqNumber = 1;
 	uint32_t ClientId;
 	CommType WaitCommState = START;
 };
+
+
 
 // Singleton
 class Communication
@@ -125,6 +129,14 @@ void MessageHandlingLoop(void)
 
 	while(true)
 	{
+		// timeout observer
+		for (auto it = clients.begin(); it != clients.end(); ++it)
+		{
+			if(it->TimedOut())
+				clients.erase(it);
+		}
+		
+
 		readMsg = COMM->GetMessage(IDLE_TIMEOUT);
 
 		if(!readMsg)
@@ -195,6 +207,8 @@ void MessageHandlingLoop(void)
 		}
 	}	
 }
+
+void timeoutObserver(void);
 
 unsigned long msElapsed(void)
 {

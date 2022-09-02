@@ -38,11 +38,15 @@ bool Compare(const std::string& p_A_filename, const std::string& p_B_filename)
 	{
 		eof = ifsA.read(arrA, FRANGMENT_SIZE).eof();
 		readA = ifsA.gcount();
-		arrA[readA] = '\0';
 
 		ifsB.read(arrB, readA);
 		readB = ifsB.gcount();
-		arrB[readB] = '\0';
+
+		if(readB < readA)
+		{
+			success = false;
+			break;
+		}
 
 		prevchkA = MyChkSum(arrA, readA, prevchkA);
 		prevchkB = MyChkSum(arrB, readB, prevchkB);
@@ -51,9 +55,6 @@ bool Compare(const std::string& p_A_filename, const std::string& p_B_filename)
 			success = false;
 
 	} while(!eof && success);
-
-	ifsA.close();
-	ifsB.close();
 
 	return success;
 }
