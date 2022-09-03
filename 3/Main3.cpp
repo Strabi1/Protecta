@@ -1,7 +1,7 @@
 
 
 #include <iostream>
-#include <list>
+#include <map>
 #include <string>
 #include <algorithm>
 
@@ -29,15 +29,13 @@ class Client
 private:
 	
 public:
-	Client(uint32_t id) : ClientId{id} {}
+	Client(uint32_t id) {}
 	~Client() {}
 
 	bool TimedOut(void) { return (( (msElapsed() - LastMsgTime_ms) > IDLE_TIMEOUT) ? true : false); }
 
 	unsigned long LastMsgTime_ms = 0;
-	uint32_t WaitSeqNumber = 1;
-	uint32_t ClientId;
-	CommType WaitCommState = START;
+	uint32_t WaitSeqNumber = 2;
 };
 
 
@@ -96,17 +94,6 @@ public:
 	void SendMessage(const Msg_st &msg) const {}
 };
 
-class ClientIdEqaul
-{
-private:
-	uint32_t than;
-public:
-	ClientIdEqaul(uint32_t than): than{than} {}
-	~ClientIdEqaul() {}
-	
-	bool operator()(Client &client) const { return than == client.ClientId; }
-};
-
 Communication *Communication::Comm = nullptr;
 
 int main(int argc, char *argv[])
@@ -123,7 +110,9 @@ int main(int argc, char *argv[])
 void MessageHandlingLoop(void)
 {
 	MyComm *COMM = (MyComm*)COMM->getInstance();
-	std::list<Client> clients;
+	//std::list<Client> clients;
+	std::map<uint32_t, Client> clients;
+
 	Communication::Msg_st *readMsg = nullptr;
 	bool comError = false;
 
@@ -132,7 +121,7 @@ void MessageHandlingLoop(void)
 		// timeout observer
 		for (auto it = clients.begin(); it != clients.end(); ++it)
 		{
-			if(it->TimedOut())
+			if(it->second.TimedOut())
 				clients.erase(it);
 		}
 		
@@ -140,71 +129,71 @@ void MessageHandlingLoop(void)
 		readMsg = COMM->GetMessage(IDLE_TIMEOUT);
 
 		if(!readMsg)
-			continue;					// Timeout
+			continue;					// No messages
 
-		auto actClient = std::find_if(clients.begin(), clients.end(), ClientIdEqaul(readMsg->clienId));
+		if(readMsg->type == START && readMsg->seqNumber == 1)
+		{
+			// New client
+			if(!clients.count(readMsg->clienId))
+			{
+				if(clients.size() < MAX_CONN)
+					clients.insert(std::pair<uint32_t, Client>(readMsg->clienId, Client(readMsg->clienId)));
+				else
+				{
+					Communication::Msg_st respMsg {.clienId = readMsg->clienId, .type = BUSY};
+					COMM->SendMessage(respMsg);
+					continue;
+				}
+			}
+		}
 
-		if(actClient == clients.end())
-			continue;					// Error, unknown client
-
+		auto actClient = &clients[readMsg->clienId];
 
 		if(readMsg->seqNumber != actClient->WaitSeqNumber)
 			comError = true;
-			
-		else
+
+		else if(actClient->TimedOut())
+			comError = true;		//??
+
+		else if(!(readMsg->type == TEXT || readMsg->type == KEEP
+			|| (readMsg->type == STOP && readMsg->seqNumber >= 3)))
 		{
-			switch(actClient->WaitCommState)
+			// The stop message must be at least the 3rd message
+			comError = true;
+		}
+
+		else if(readMsg->type == TEXT)
+		{
+			printf("%s", readMsg->msg);
+		}
+		else if(readMsg->type == STOP)
+		{
+			//actClient->WaitCommState = START;
+			actClient->WaitSeqNumber = 0;
+		}
+		else if(readMsg->type == TEXT)
+		{
+			printf("%s", readMsg->msg);
+		}
+
+		if(comError || readMsg->type == STOP)
+		{
+			if (comError)
 			{
-				case START:
-				{
-					if(readMsg->type != START)
-						comError = true;
-					else
-						actClient->WaitCommState = TEXT;
-				} break;
-
-				case KEEP:
-				case TEXT:
-				{
-					// overflow save, due to unsigned arithmetic
-					if(msElapsed() - actClient->LastMsgTime_ms > IDLE_TIMEOUT)
-						comError = true;
-					
-					else if(!(readMsg->type == TEXT || readMsg->type == KEEP
-						|| (readMsg->type == STOP && readMsg->seqNumber >= 3)))
-					{
-						// The stop message must be at least the 3rd message
-						comError = true;
-					}
-
-					else if(readMsg->type == TEXT)
-					{
-						printf("%s", readMsg->msg);
-					}
-					else if(readMsg->type == STOP)
-					{
-						actClient->WaitCommState = START;
-						actClient->WaitSeqNumber = 0;
-					}
-				} break;
-				
-				default:
-					break;
+				Communication::Msg_st respMsg {.clienId = readMsg->clienId, .type = ABORT};
+				COMM->SendMessage(respMsg);
 			}
 
+			// Free message
+			clients.erase(readMsg->clienId);
+		}
+		else
+		{
+			actClient->LastMsgTime_ms = msElapsed();
 			actClient->WaitSeqNumber++;
 		}
-		if(comError)
-		{
-			Communication::Msg_st respMsg {.clienId = readMsg->clienId, .type = ABORT};
 
-			actClient->WaitCommState = START;
-			COMM->SendMessage(respMsg);
-
-			// Free message
-			free(readMsg);
-			clients.erase(actClient);
-		}
+		free(readMsg);
 	}	
 }
 
