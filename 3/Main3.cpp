@@ -29,7 +29,7 @@ class Client
 private:
 	
 public:
-	Client(uint32_t id) {}
+	Client() {}
 	~Client() {}
 
 	bool TimedOut(void) { return (( (msElapsed() - LastMsgTime_ms) > IDLE_TIMEOUT) ? true : false); }
@@ -147,7 +147,7 @@ void MessageHandlingLoop(void)
 			}
 			else
 				// Connection ok
-				clients.insert(std::pair<uint32_t, Client>(readMsg->clienId, Client(readMsg->clienId)));
+				clients.insert(std::pair<uint32_t, Client>(readMsg->clienId, Client()));
 		}
 		else
 		{
@@ -180,12 +180,13 @@ void MessageHandlingLoop(void)
 			}
 			else
 			{
+				// Saving the time of sending the last message
 				actClient->LastMsgTime_ms = msElapsed();
 				actClient->WaitSeqNumber++;
 			}
-
 		}
 
+		// Free message
 		free(readMsg);
 	}	
 }
