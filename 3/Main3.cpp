@@ -110,7 +110,6 @@ int main(int argc, char *argv[])
 void MessageHandlingLoop(void)
 {
 	MyComm *COMM = (MyComm*)COMM->getInstance();
-	//std::list<Client> clients;
 	std::map<uint32_t, Client> clients;
 
 	Communication::Msg_st *readMsg = nullptr;
@@ -118,86 +117,78 @@ void MessageHandlingLoop(void)
 
 	while(true)
 	{
-		// timeout observer
+		// Timeout observer
 		for (auto it = clients.begin(); it != clients.end(); ++it)
 		{
 			if(it->second.TimedOut())
 				clients.erase(it);
 		}
 		
-
+		// Read message
 		readMsg = COMM->GetMessage(IDLE_TIMEOUT);
 
 		if(!readMsg)
 			continue;					// No messages
 
-		if(readMsg->type == START && readMsg->seqNumber == 1)
+		// New client
+		if(!clients.count(readMsg->clienId))
 		{
-			// New client
-			if(!clients.count(readMsg->clienId))
+			if(readMsg->type != START || readMsg->seqNumber != 1)
 			{
-				if(clients.size() < MAX_CONN)
-					clients.insert(std::pair<uint32_t, Client>(readMsg->clienId, Client(readMsg->clienId)));
-				else
-				{
-					Communication::Msg_st respMsg {.clienId = readMsg->clienId, .type = BUSY};
-					COMM->SendMessage(respMsg);
-					continue;
-				}
-			}
-		}
-
-		auto actClient = &clients[readMsg->clienId];
-
-		if(readMsg->seqNumber != actClient->WaitSeqNumber)
-			comError = true;
-
-		else if(actClient->TimedOut())
-			comError = true;		//??
-
-		else if(!(readMsg->type == TEXT || readMsg->type == KEEP
-			|| (readMsg->type == STOP && readMsg->seqNumber >= 3)))
-		{
-			// The stop message must be at least the 3rd message
-			comError = true;
-		}
-
-		else if(readMsg->type == TEXT)
-		{
-			printf("%s", readMsg->msg);
-		}
-		else if(readMsg->type == STOP)
-		{
-			//actClient->WaitCommState = START;
-			actClient->WaitSeqNumber = 0;
-		}
-		else if(readMsg->type == TEXT)
-		{
-			printf("%s", readMsg->msg);
-		}
-
-		if(comError || readMsg->type == STOP)
-		{
-			if (comError)
-			{
+				// Wrond message type or sequent number
 				Communication::Msg_st respMsg {.clienId = readMsg->clienId, .type = ABORT};
 				COMM->SendMessage(respMsg);
 			}
-
-			// Free message
-			clients.erase(readMsg->clienId);
+			else if(clients.size() >= MAX_CONN)
+			{
+				// Too many client
+				Communication::Msg_st respMsg {.clienId = readMsg->clienId, .type = BUSY};
+				COMM->SendMessage(respMsg);
+			}
+			else
+				// Connection ok
+				clients.insert(std::pair<uint32_t, Client>(readMsg->clienId, Client(readMsg->clienId)));
 		}
 		else
 		{
-			actClient->LastMsgTime_ms = msElapsed();
-			actClient->WaitSeqNumber++;
+			// Old client
+			auto actClient = &clients[readMsg->clienId];
+
+			if(readMsg->seqNumber != actClient->WaitSeqNumber)
+				comError = true;
+
+			else if(!(readMsg->type == TEXT || readMsg->type == KEEP
+				|| (readMsg->type == STOP && readMsg->seqNumber >= 3)))
+			{
+				// The stop message must be at least the 3rd message
+				comError = true;
+			}
+
+			else if(readMsg->type == TEXT)
+				printf("%s", readMsg->msg);
+
+			if(comError || readMsg->type == STOP)
+			{
+				if (comError)
+				{
+					Communication::Msg_st respMsg {.clienId = readMsg->clienId, .type = ABORT};
+					COMM->SendMessage(respMsg);
+				}
+
+				// Delete client
+				clients.erase(readMsg->clienId);
+			}
+			else
+			{
+				actClient->LastMsgTime_ms = msElapsed();
+				actClient->WaitSeqNumber++;
+			}
+
 		}
 
 		free(readMsg);
 	}	
 }
-
-void timeoutObserver(void);
 
 unsigned long msElapsed(void)
 {
